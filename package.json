@@ -1,0 +1,27 @@
+{
+  "name": "ai-image-gallery",
+  "version": "1.0.0",
+  "description": "AI Image Gallery - Complete Full-Stack Application",
+  "scripts": {
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "dev": "npm run start",
+    "start:backend": ".venv\\Scripts\\python.exe backend\\main.py",
+    "start:frontend": "cd frontend && npm start",
+    "build": "cd frontend && npm run build",
+    "install:all": "cd frontend && npm install",
+    "setup": "python -m venv .venv && .venv\\Scripts\\activate && pip install -r backend/requirements.txt && npm run install:all"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "keywords": [
+    "ai",
+    "image-gallery",
+    "fastapi",
+    "react",
+    "supabase",
+    "openai"
+  ],
+  "author": "AI Image Gallery Team",
+  "license": "MIT"
+}
