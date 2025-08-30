@@ -8,7 +8,8 @@ import { ImageItem } from '../types';
 import { apiService } from '../services/api';
 
 export const Gallery: React.FC = () => {
-  const [images, setImages] = useState<ImageItem[]>([]);
+  const [allImages, setAllImages] = useState<ImageItem[]>([]); // Store all images
+  const [filteredImages, setFilteredImages] = useState<ImageItem[]>([]); // Store filtered results
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
   const [currentView, setCurrentView] = useState<
@@ -20,7 +21,8 @@ export const Gallery: React.FC = () => {
     setLoading(true);
     try {
       const fetchedImages = await apiService.getImages();
-      setImages(fetchedImages);
+      setAllImages(fetchedImages);
+      setFilteredImages(fetchedImages);
       setCurrentView('all');
     } catch (error) {
       console.error('Failed to load images:', error);
@@ -28,6 +30,44 @@ export const Gallery: React.FC = () => {
       setLoading(false);
     }
   }, []);
+
+  // Local search function
+  const performLocalSearch = useCallback(
+    (query: string, images: ImageItem[]) => {
+      if (!query.trim()) {
+        return images;
+      }
+
+      const searchTerm = query.toLowerCase().trim();
+
+      return images.filter((image) => {
+        // Search in filename
+        if (image.filename.toLowerCase().includes(searchTerm)) {
+          return true;
+        }
+
+        // Search in metadata if available
+        if (image.metadata) {
+          // Search in description
+          if (image.metadata.description?.toLowerCase().includes(searchTerm)) {
+            return true;
+          }
+
+          // Search in tags
+          if (
+            image.metadata.tags?.some((tag) =>
+              tag.toLowerCase().includes(searchTerm)
+            )
+          ) {
+            return true;
+          }
+        }
+
+        return false;
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     loadImages();
@@ -38,39 +78,36 @@ export const Gallery: React.FC = () => {
   };
 
   const handleSearch = useCallback(
-    async (query: string) => {
+    (query: string) => {
+      setCurrentQuery(query);
+
       if (query.trim() === '') {
-        loadImages();
+        setFilteredImages(allImages);
+        setCurrentView('all');
         return;
       }
 
-      setLoading(true);
-      setCurrentQuery(query);
-      try {
-        const searchResults = await apiService.searchImages(query);
-        setImages(searchResults.images);
-        setCurrentView('search');
-      } catch (error) {
-        console.error('Search failed:', error);
-      } finally {
-        setLoading(false);
-      }
+      // Perform local search
+      const searchResults = performLocalSearch(query, allImages);
+      setFilteredImages(searchResults);
+      setCurrentView('search');
     },
-    [loadImages]
+    [allImages, performLocalSearch]
   );
 
   const handleClearSearch = useCallback(() => {
     setCurrentQuery('');
-    loadImages();
-  }, [loadImages]);
+    setFilteredImages(allImages);
+    setCurrentView('all');
+  }, [allImages]);
 
   const handleSimilarImages = (similarImages: ImageItem[]) => {
-    setImages(similarImages);
+    setFilteredImages(similarImages);
     setCurrentView('similar');
   };
 
   const handleColorFilter = (colorImages: ImageItem[]) => {
-    setImages(colorImages);
+    setFilteredImages(colorImages);
     setCurrentView('color');
   };
 
@@ -108,7 +145,9 @@ export const Gallery: React.FC = () => {
                 <h2 className="text-lg font-medium text-gray-900">
                   {getViewTitle()}
                 </h2>
-                <p className="text-sm text-gray-600">{images.length} images</p>
+                <p className="text-sm text-gray-600">
+                  {filteredImages?.length || 0} images
+                </p>
               </div>
 
               <div className="flex items-center gap-4">
@@ -119,7 +158,11 @@ export const Gallery: React.FC = () => {
                 />
                 {currentView !== 'all' && (
                   <button
-                    onClick={loadImages}
+                    onClick={() => {
+                      setFilteredImages(allImages);
+                      setCurrentView('all');
+                      setCurrentQuery('');
+                    }}
                     className="px-4 py-2 text-sm font-medium text-indigo-600 bg-white border border-indigo-600 rounded-md hover:bg-indigo-50"
                   >
                     Show All
@@ -131,7 +174,7 @@ export const Gallery: React.FC = () => {
 
           {/* Image Grid */}
           <ImageGrid
-            images={images}
+            images={filteredImages}
             onImageClick={setSelectedImage}
             loading={loading}
           />
@@ -139,19 +182,21 @@ export const Gallery: React.FC = () => {
           {/* Pagination could be added here */}
 
           {/* Load more button for simplicity */}
-          {!loading && images.length > 0 && images.length % 20 === 0 && (
-            <div className="mt-8 text-center">
-              <button
-                onClick={() => {
-                  // Load more images logic would go here
-                  console.log('Load more images');
-                }}
-                className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-              >
-                Load More
-              </button>
-            </div>
-          )}
+          {!loading &&
+            filteredImages.length > 0 &&
+            filteredImages.length % 20 === 0 && (
+              <div className="mt-8 text-center">
+                <button
+                  onClick={() => {
+                    // Load more images logic would go here
+                    console.log('Load more images');
+                  }}
+                  className="px-6 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                >
+                  Load More
+                </button>
+              </div>
+            )}
         </div>
       </main>
 

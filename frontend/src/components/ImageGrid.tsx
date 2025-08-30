@@ -27,7 +27,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
     );
   }
 
-  if (images.length === 0) {
+  if (!images || images.length === 0) {
     return (
       <div className="text-center py-12">
         <div className="text-gray-500">
@@ -52,7 +52,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-      {images.map((image) => (
+      {(images || []).map((image) => (
         <div
           key={image.id}
           className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"

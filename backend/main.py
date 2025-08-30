@@ -421,54 +421,58 @@ async def search_images(
     try:
         user_id = await verify_token(credentials.credentials, supabase_client)
         
-        # Calculate offset for pagination
-        offset = (request.page - 1) * request.limit
+        # Use service client and manually filter by user_id
+        service_client = supabase_client.get_service_client()
         
-        # Use the search function from Supabase
-        response = supabase_client.rpc(
-            'search_images',
-            {
-                'search_term': request.query,
-                'user_uuid': user_id
-            }
-        ).limit(request.limit).offset(offset).execute()
+        # Get all user's images with metadata
+        result = service_client.table("images").select(
+            "*, image_metadata(*)"
+        ).eq("user_id", user_id).order("uploaded_at", desc=True).execute()
         
         search_results = []
-        for row in response.data:
-            metadata = ImageMetadata(
-                id=row.get("id"),
-                image_id=row.get("image_id"),
-                user_id=user_id,
-                description=row.get("description"),
-                tags=row.get("tags", []),
-                colors=row.get("colors", []),
-                ai_processing_status="completed"
-            )
-            
-            search_results.append(ImageResponse(
-                id=row["image_id"],
-                filename=row["filename"],
-                original_path=row["original_path"],
-                thumbnail_path=row["thumbnail_path"],
-                uploaded_at=row["uploaded_at"],
-                user_id=user_id,
-                metadata=metadata
-            ))
+        search_term_lower = request.query.lower()
         
-        # Get total count for pagination
-        total_response = supabase_client.rpc(
-            'search_images',
-            {
-                'search_term': request.query,
-                'user_uuid': user_id
-            }
-        ).execute()
+        for img in result.data:
+            # Check if image has metadata
+            if img.get("image_metadata") and len(img["image_metadata"]) > 0:
+                metadata = img["image_metadata"][0]
+                description = metadata.get("description", "").lower()
+                tags = [tag.lower() for tag in metadata.get("tags", [])]
+                
+                # Check if search term matches description or any tag
+                if (search_term_lower in description or 
+                    any(search_term_lower in tag for tag in tags)):
+                    
+                    image_metadata = ImageMetadata(
+                        id=metadata.get("id"),
+                        image_id=img["id"],
+                        user_id=user_id,
+                        description=metadata.get("description"),
+                        tags=metadata.get("tags", []),
+                        colors=metadata.get("colors", []),
+                        ai_processing_status=metadata.get("ai_processing_status", "completed")
+                    )
+                    
+                    search_results.append(ImageResponse(
+                        id=img["id"],
+                        filename=img["filename"],
+                        original_path=img["original_path"],
+                        thumbnail_path=img["thumbnail_path"],
+                        uploaded_at=img["uploaded_at"],
+                        user_id=user_id,
+                        metadata=image_metadata
+                    ))
         
-        total = len(total_response.data)
-        has_more = offset + request.limit < total
+        # Apply pagination
+        total = len(search_results)
+        start_idx = (request.page - 1) * request.limit
+        end_idx = start_idx + request.limit
+        paginated_results = search_results[start_idx:end_idx]
+        
+        has_more = end_idx < total
         
         return SearchResponse(
-            images=search_results,
+            images=paginated_results,
             total=total,
             page=request.page,
             limit=request.limit,

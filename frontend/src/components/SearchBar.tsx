@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface SearchBarProps {
@@ -16,22 +16,38 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const debounceRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
+    // Clear any existing timeout
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    // Set new timeout for debounced search
+    debounceRef.current = window.setTimeout(() => {
       if (query.trim()) {
         onSearch(query.trim());
       } else {
         onClear();
       }
-    }, 300); // Debounce search
+    }, 500); // Debounce time for better UX
 
-    return () => clearTimeout(timeoutId);
+    // Cleanup function
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
   }, [query, onSearch, onClear]);
 
   const handleClear = () => {
     setQuery('');
     onClear();
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(e.target.value);
   };
 
   return (
@@ -41,7 +57,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={handleInputChange}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
